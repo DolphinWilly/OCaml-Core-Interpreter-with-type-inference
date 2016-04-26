@@ -76,7 +76,7 @@ let rec lookup_var (env : environment) (x : var) : value =
   | [] -> VError "Unbound variable"
   | (v, rval)::t -> if x = v then !rval else lookup_var t x
 
-(*)
+(*
 (** Format a value for printing. *)
 let rec format_value (f : Format.formatter) (v : value) : unit =
   (* You will probably want to call Format.fprint f f <format string> <args>.
