@@ -76,6 +76,7 @@ let rec lookup_var (env : environment) (x : var) : value =
   | [] -> VError "Unbound variable"
   | (v, rval)::t -> if x = v then !rval else lookup_var t x
 
+(*)
 (** Format a value for printing. *)
 let rec format_value (f : Format.formatter) (v : value) : unit =
   (* You will probably want to call Format.fprint f f <format string> <args>.
@@ -102,11 +103,12 @@ let rec format_value (f : Format.formatter) (v : value) : unit =
    *)
   failwith "The light was frozen, dead, a ghost."
 
-(** use format_value to print a value to the console *)
+  (** use format_value to print a value to the console *)
 let print_value = Printer.make_printer format_value
 
 (** use format_value to convert a value to a string *)
 let string_of_value = Printer.make_string_of format_value
+*)
 
 (******************************************************************************)
 (** eval **********************************************************************)
@@ -128,7 +130,10 @@ let rec eval env e =
   | Var x -> lookup_var env x
   | Let (x, e1, e2) -> eval ((x, ref (eval env e1))::env) e2
   | LetRec (x, e1, e2) ->
-    let v1 = eval ((x, ref VUnit)::env) e1 in eval ((x, ref v1)::env) e2
+    let vd = ref (VError "Invalid use of LetRec") in
+    let v1 = eval ((x, vd)::env) e1 in
+    vd := v1;
+    eval ((x, vd)::env) e2
   | App (e1, e2) ->
     begin
       match eval env e1 with
