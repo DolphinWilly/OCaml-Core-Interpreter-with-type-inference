@@ -119,7 +119,6 @@ let rec find (l: (var * typ) list) (x: var): (var * typ) option =
   | [] -> None
   | (v, t) :: tl -> if x = v then Some (v, t)
                     else find tl x
-
 let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : annotated_expr)
                      : equation list =
       match e with
@@ -171,19 +170,7 @@ let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : ann
             :: (collect_expr specs vars e1) @
             (collect_expr specs vars e2) @
             (collect_expr specs vars e3)
-      | AMatch (t1, e1, l) ->
-         let rec helper t e l =
-          match l with
-          | [] -> []
-          | hd::tl -> let (p1, e1) = hd in
-                      let t1 = typeof_pat p1 in
-                      let t2 = typeof e1 in
-                      let t0 = typeof e in
-                      (Eq (t, t2)) :: (Eq (t0, t1)) ::
-                      (collect_case specs vars p1 e1) @
-                      (helper t e tl) in
-         helper t1 e1 l
-      | _ -> failwith "not implemented"
+      | _ -> failwith "not implement match and variant"
 
 
 
@@ -192,30 +179,12 @@ let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : ann
   * tconst refers to the type of the parameters of the specific constructors
   * tvariant refers to the type of the variant as a whole
   *)
-and collect_case specs vs (p:annotated_pattern) (e:annotated_expr) =
-  match p with
-  | APVar (t1, x) -> (collect_expr specs ((x,t1)::vs) e)
-  | APPair (t1, p1, p2) -> (collect_pat specs p) @
-            (collect_case specs vs p1 e) @
-            (collect_case specs vs p2 e)
-  | _ -> (collect_pat specs p) @ (collect_expr specs vs e)
-
-
+and collect_case specs vs tconst tvariant ((p:annotated_pattern),(e:annotated_expr)) =
+  failwith "A love of nature keeps no factories busy."
 
 (** return the constraints and variables for a pattern *)
 and collect_pat specs (p:annotated_pattern) =
-  match p with
-    | APUnit  (t1) -> [Eq (t1, TUnit)]
-    | APInt   (t1, n) -> [Eq (t1, TInt)]
-    | APBool  (t1, b) -> [Eq (t1, TBool)]
-    | APString  (t1, s) -> [Eq (t1, TString)]
-    | APVar     (t1, x) -> []
-    | APVariant (t1, c, p) -> failwith "not implemented"
-    | APPair    (t1, p1, p2) ->
-        let t2 = typeof_pat p1 in
-        let t3 = typeof_pat p2 in
-        [Eq (t1, TStar (t2, t3))]
-
+  failwith "Isn't there something in living dangerously?"
 
 (******************************************************************************)
 (** constraint generation                                                    **)
