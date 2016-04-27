@@ -33,7 +33,7 @@ let rec subst_typ ((x,t'):substitution) (t:typ) =
 let subst_eqn (s : substitution) (eqns : equation list) : equation list =
   List.map (fun (Eq (t1,t2)) -> Eq(subst_typ s t1, subst_typ s t2)) eqns
 
-(** apply a type substitution to an annotated expression 
+(** apply a type substitution to an annotated expression
     we deliberately violate the 80-column restriction here to make the
     parallelism in the definition clearer, hence easier to read *)
 let rec subst_expr (s : substitution) (e : annotated_expr) : annotated_expr =
@@ -87,14 +87,24 @@ let string_of_eqns = Printer.make_string_of format_eqns
 
 
 (** generate an unused type variable *)
+let counter =
+  let r = ref 0 in
+  fun () -> let _ = r := 1 + !r in !r
+
 let newvar () : typ =
-  failwith "I like being myself. Myself and nasty."
+  TAlpha (Format.sprintf "n%02i" (counter ()) )
+
+
 
 
 
 (* return the constraints for a binary operator *)
 let collect_binop (t:typ) (op:operator) (tl:typ) (tr:typ) : equation list =
-  failwith "Most human beings have an almost infinite capacity for taking things for granted."
+  match op with
+  | Plus | Minus | Times -> [(t, Tint); (tl, Tint); (tr, Tint)]
+  | Gt | Lt | Eq | GtEq | LtEq | NotEq -> [(t, TBool); (tl, tr)]
+  | Concat -> [(t, TString); (tl, TString); (tr, TString)]
+
 
 (** return the constraints for an expr
   * vars refers to a data structure that stores the types of each of the variables
