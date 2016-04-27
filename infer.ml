@@ -101,9 +101,11 @@ let newvar () : typ =
 (* return the constraints for a binary operator *)
 let collect_binop (t:typ) (op:operator) (tl:typ) (tr:typ) : equation list =
   match op with
-  | Plus | Minus | Times -> [(t, Tint); (tl, Tint); (tr, Tint)]
-  | Gt | Lt | Eq | GtEq | LtEq | NotEq -> [(t, TBool); (tl, tr)]
-  | Concat -> [(t, TString); (tl, TString); (tr, TString)]
+  | Plus | Minus | Times -> [Eq (t, TInt); Eq (tl, TInt); Eq (tr, TInt)]
+  | Gt | Lt | Eq | GtEq | LtEq | NotEq -> [Eq (t, TBool); Eq (tl, tr)]
+  | Concat -> [Eq (t, TString); Eq (tl, TString); Eq (tr, TString)]
+
+
 
 
 (** return the constraints for an expr
@@ -111,9 +113,67 @@ let collect_binop (t:typ) (op:operator) (tl:typ) (tr:typ) : equation list =
   * that have been defined.
   * It is completely your decision what type of data structure you want to use for vars
   *)
-let rec collect_expr (specs:variant_spec list) vars (e : annotated_expr)
+(* find the latest binding in the vars*)
+let rec find (l: (var * typ) list) (x: var): (var * typ) option =
+  match l with
+  | [] -> None
+  | (v, t) :: tl -> if x = v then Some (v, t)
+                    else find tl x
+let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : annotated_expr)
                      : equation list =
-  failwith "Great is truth, but still greater, from a practical point of view, is silence about truth."
+      match e with
+      | AVar (t1, v1) -> begin match find vars v1 with
+                                | None -> failwith "Unbound variable"
+                                | Some (v, t) -> [Eq (t1, t)]
+                         end
+      | AApp (t1, e1, e2) ->
+                begin match e1 with
+                       | AFun (t2, (v1, t3), e3)
+                          -> let t4 = typeof e3 in
+                             let t5 = typeof e2 in
+                      [Eq (t2, TArrow (t3, t4)); Eq (t3, t5)] @
+                      (collect_expr specs ((v1,t3)::vars) e3) @
+                      (collect_expr specs vars e2)
+                      | _ -> failwith "apply should use a function"
+
+                end
+      | AFun (t1, (v1, t2), e1) ->
+              let t3 = typeof e1 in
+              (Eq (t1, TArrow (t2, t3))) :: (collect_expr specs ((v1, t2)::vars) e1)
+      | ALet (t1, (v1, t2), e1, e2) ->
+              let t3 = typeof e1 in
+              let t4 = typeof e2 in
+              (Eq (t2, t3)) :: (Eq (t4, t1)) :: (collect_expr specs vars e1)
+              @ (collect_expr specs ((v1, t2)::vars) e2)
+      | ALetRec (t1, (v1, t2), e1, e2) ->
+              let t3 = typeof e1 in
+              let t4 = typeof e2 in
+              (Eq (t2, t3)) :: (Eq (t4, t1)) :: (collect_expr specs ((v1,t2)::vars) e1)
+              @ (collect_expr specs ((v1, t2)::vars) e2)
+      | AUnit t1 -> [Eq (t1, TUnit)]
+      | AInt (t1, i) -> [Eq (t1, TInt)]
+      | ABool (t1, b) -> [Eq (t1, TBool)]
+      | AString (t1, s) -> [Eq (t1, TString)]
+      | APair (t1, e1, e2) -> let t2 = typeof e1 in
+                              let t3 = typeof e2 in
+              (Eq (t1, TStar (t2, t3))):: (collect_expr specs vars e1)
+              @ (collect_expr specs vars e2)
+      | ABinOp (t1, o, e1, e2) -> let t2 = typeof e1 in
+                                  let t3 = typeof e2 in
+              (collect_binop t1 o t2 t3) @
+              (collect_expr specs vars e1) @
+              (collect_expr specs vars e2)
+      | AIf (t1, e1, e2, e3) -> let t2 = typeof e1 in
+                                let t3 = typeof e2 in
+                                let t4 = typeof e3 in
+            (Eq (t2, TBool)) :: (Eq (t1, t3)) :: (Eq (t1, t4)) :: (Eq (t3, t4))
+            :: (collect_expr specs vars e1) @
+            (collect_expr specs vars e2) @
+            (collect_expr specs vars e3)
+      | _ -> failwith "not implement match and variant"
+
+
+
 
 (** return the constraints for a match cases
   * tconst refers to the type of the parameters of the specific constructors
