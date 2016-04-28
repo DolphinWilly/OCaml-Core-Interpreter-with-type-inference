@@ -21,7 +21,6 @@ and environment = (var * value ref) list
  * need them, change their types or arguments, delete them, whatever.
  *)
 
-(* Convert a value to a string for printing. *)
 let rec string_of_value (v : value) : string =
   match v with
   | VUnit                -> "()"
@@ -29,12 +28,11 @@ let rec string_of_value (v : value) : string =
   | VBool b              -> string_of_bool b
   | VString s            -> s
   | VClosure _           -> "<fun>"
-  | VVariant (con, val_) -> con ^ (string_of_value val_)
+  | VVariant (con, val_) -> con ^ " " ^ (string_of_value val_)
   | VPair (v1, v2)       -> "(" ^ (string_of_value v1) ^ ", "
                                 ^ (string_of_value v2) ^ ")"
   | VError s             -> s
 
-(* Convert a binary operator to a string for printing *)
 let string_of_binop (op : operator) : string =
   match op with
   | Plus   -> "+"
