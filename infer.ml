@@ -120,6 +120,23 @@ let rec find (l: (var * typ) list) (x: var): (var * typ) option =
   | (v, t) :: tl -> if x = v then Some (v, t)
                     else find tl x
 
+(* find what type does a specific constructor belong to *)
+let rec fc (l: variant_spec list) (c: constructor): (talpha list * tname * typ) =
+  match l with
+  | [] -> failwith "type not defined"
+  | hd :: tl -> let vs = hd.vars in
+                let tn = hd.name in
+                let cs = hd.constructors in
+                let rec helper cs =
+                  match cs with
+                  | [] -> fc tl c
+                  | (constr, ty) :: til ->
+                    if constr = c then (vs, tn, ty)
+                    else helper til in
+                helper cs
+
+
+
 let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : annotated_expr)
                      : equation list =
       match e with
@@ -182,8 +199,16 @@ let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : ann
                       (Eq (t, t2)) :: (Eq (t0, t1)) ::
                       (collect_case specs vars p1 e1) @
                       (helper t e tl) in
-         helper t1 e1 l
-      | _ -> failwith "not implemented"
+         (helper t1 e1 l) @ (collect_expr specs vars e1)
+      | AVariant (t1, c, e1) ->
+            let (tal, tn, ty) = fc specs c in
+            let rec tcreate (n: int): typ list =
+             if n = 0 then []
+             else (newvar ()) :: (tcreate (n-1)) in
+            let x = tcreate (List.length tal) in
+            (Eq (t1, TVariant (x, tn)) ) :: (Eq (ty, (typeof e1))) ::
+            (collect_expr specs vars e1)
+
 
 
 
