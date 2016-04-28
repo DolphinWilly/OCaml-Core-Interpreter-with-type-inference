@@ -235,11 +235,18 @@ and collect_pat specs (p:annotated_pattern) =
     | APBool  (t1, b) -> [Eq (t1, TBool)]
     | APString  (t1, s) -> [Eq (t1, TString)]
     | APVar     (t1, x) -> []
-    | APVariant (t1, c, p) -> failwith "not implemented"
+    | APVariant (t1, c, p) ->
+            let (tal, tn, ty) = fc specs c in
+            let rec tcreate (n: int): typ list =
+             if n = 0 then []
+             else (newvar ()) :: (tcreate (n-1)) in
+            let x = tcreate (List.length tal) in
+            (Eq (t1, TVariant (x, tn))) :: (Eq (ty, (typeof_pat p))) ::
+            (collect_pat specs p)
     | APPair    (t1, p1, p2) ->
         let t2 = typeof_pat p1 in
         let t3 = typeof_pat p2 in
-        [Eq (t1, TStar (t2, t3))]
+        [Eq (t1, TStar (t2, t3))] @ (collect_pat specs p1) @ (collect_pat specs p2)
 
 
 (******************************************************************************)
@@ -251,7 +258,7 @@ and collect_pat specs (p:annotated_pattern) =
  * be satisfied for e to typecheck.
  *)
 let collect specs e =
-  failwith "Never put off till tomorrow the fun you can have today."
+  collect_expr specs [] e
 
 (******************************************************************************)
 (** constraint solver (unification)                                          **)
