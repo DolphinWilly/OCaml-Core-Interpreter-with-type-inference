@@ -9,7 +9,6 @@ let check_error v =
   | VError _ -> true
   | _ -> false;;
 
-
 (* Primitive types *)
 TEST_UNIT = eval [] Unit                   === VUnit
 TEST_UNIT = eval [] (Int 42)               === VInt 42
