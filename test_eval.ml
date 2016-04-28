@@ -201,6 +201,25 @@ TEST_UNIT = eval [] (
 TEST_UNIT = check_error (
   eval [] (parse_expr "let f = fun n -> f n in f 3")) === true
 
+(* Deep match  on variants*)
+TEST_UNIT = eval [] (parse_expr "
+  match Cons (4, Cons (3, Nil ())) with
+  | Cons (3, x) -> true
+  | Cons (4, Cons (3, x)) -> false") === VBool false
+
+(* Nested match *)
+TEST_UNIT = eval [] (parse_expr "
+  match Left Middle Right 3 with
+  | Left x -> match x with
+    | Left y -> false
+    | Middle y -> match y with
+      | Left z -> false
+      | Middle z -> false
+      | Right z -> true
+    | Right y -> false
+  | Middle x -> false
+  | Right x -> false") === VBool true
+
 (* Reverse a list *)
 TEST_UNIT = eval [] (parse_expr "
   let rec rev =
@@ -213,25 +232,6 @@ TEST_UNIT = eval [] (parse_expr "
   VVariant ("Cons", VPair (VInt 5,
   VVariant ("Cons", VPair (VInt 4,
   VVariant ("Cons", VPair (VInt 3, VVariant ("Nil", VUnit)))))))
-
-(* Nested match *)
-TEST_UNIT = eval [] (parse_expr "
-  match Left Middle Right 3 with
-  | Left x -> match x with
-    | Left y -> ()
-    | Middle y -> match y with
-      | Left z -> ()
-      | Middle z -> ()
-      | Right z -> true
-    | Right y -> ()
-  | Middle x -> ()
-  | Right x -> ()") === VBool true
-
-(* Deep match  on variants*)
-TEST_UNIT = eval [] (parse_expr "
-  match Cons (4, Cons (3, Nil ())) with
-  | Cons (3, x) -> true
-  | Cons (4, Cons (3, x)) -> false") === VBool false
 
 (* gcd on positive integers *)
 let gcdpos = parse_expr "
