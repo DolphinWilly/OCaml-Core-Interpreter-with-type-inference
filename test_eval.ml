@@ -248,7 +248,6 @@ TEST_UNIT = eval [] (App (App (gcdpos, Int 9), Int 33))        === VInt 3
 TEST_UNIT = eval [] (App (App (gcdpos, Int 2), Int 2))         === VInt 2
 TEST_UNIT = eval [] (App (App (gcdpos, Int 53248), Int 31636)) === VInt 4
 
-
 (* count_bin_trees from ps1 *)
 let catalan = parse_expr "
   let rec count_bin_trees =
