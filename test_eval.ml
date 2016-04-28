@@ -269,7 +269,6 @@ TEST_UNIT = eval [] (App (catalan, Int 10)) === VInt 16796
 
 (* Dijkstra's algorithm. Graph is a list of pairs (v, n) where n is a list
 of neighbors (v, w_v), v is a vertex (int), w_v are costs >= 0. Not efficient.*)
-
 let shortest_distance = parse_expr "
   let rec generate_lvisit =
     fun g ->
