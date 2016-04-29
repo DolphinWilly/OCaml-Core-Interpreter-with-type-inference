@@ -46,6 +46,17 @@ let string_of_binop (op : operator) : string =
   | NotEq  -> "<>"
   | Concat -> "^"
 
+let rec string_of_pattern (p : pattern) : string =
+  match p with
+  | PUnit                -> "()"
+  | PInt i               -> string_of_int i
+  | PBool b              -> string_of_bool b
+  | PString s            -> s
+  | PVar v               -> v
+  | PVariant (con, p') -> con ^ " " ^ (string_of_pattern p')
+  | PPair (p1, p2)       -> "(" ^ (string_of_pattern p1) ^ ", "
+                                ^ (string_of_pattern p2) ^ ")"
+
  (**
   * try to match a value against a pattern. If the match succeeds, return an
   * environment containing all of the bindings. If it fails, return None.
@@ -66,6 +77,13 @@ let rec find_match (p : pattern) (v : value) : environment option =
       | _                      -> None
     end
   | _ -> None
+
+(* Check if a single pattern contains duplicate bindings *)
+let rec has_duplicate (env : environment) : bool = snd (
+  List.fold_left (fun (i, b) (v, _) ->
+    (i + 1, snd (List.fold_left (fun (i', b') (v', _) ->
+      (i' + 1, b' || (i' > i && v' = v))) (0, b) env))
+    ) (0, false) env)
 
 (** apply the given operator to the given arguments *)
 let rec eval_operator (op : operator) (v1 : value) (v2 : value) : value =
@@ -204,7 +222,11 @@ let rec eval env e =
         | (pat, exp_)::t ->
           begin
             match find_match pat v1 with
-            | Some newenv -> eval (newenv@env) exp_
+            | Some newenv ->
+              if has_duplicate newenv then
+                VError ("Duplicate binding in pattern '"
+                  ^ string_of_pattern pat ^ "'")
+              else eval (newenv@env) exp_
             | None        -> eval_match t
           end in
       match (eval env exp) with

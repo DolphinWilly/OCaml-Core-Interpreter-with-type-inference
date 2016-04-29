@@ -245,6 +245,10 @@ TEST_UNIT = check_error (eval [] (
 TEST_UNIT = check_error (eval [] (
   parse_expr "match (3, 4) with (x, 3) -> 1 | (4, y) -> 2")) === true
 
+(* Match: duplicate binding in pattern *)
+TEST_UNIT = check_error (eval [] (
+  parse_expr "match (3, 4) with (x, x) -> x")) === true
+
 (* Let: shadowing *)
 TEST_UNIT = eval [] (
   parse_expr "let x = 3 in let y = 4 in
