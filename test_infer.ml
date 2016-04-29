@@ -39,8 +39,8 @@ TEST_UNIT = typeof_infer [] (BinOp (Eq, String "hij", String "hij")) === TBool
 TEST_UNIT = typeof_infer [] (BinOp (Concat, String "hij", String "hji"))
     === TString
 
-(* Functional comparisons should raise errors *)
-TEST_UNIT =  infer_raises [] (parse_expr "(fun x -> x) = (fun y -> y)")  === ()
+(* Let shadowing with different types *)
+TEST_UNIT =  typeof_infer [] (parse_expr "let x = 3 in let x = true in x")  === TBool
 
 (* If expressions *)
 TEST_UNIT = typeof_infer [] (
