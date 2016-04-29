@@ -108,6 +108,47 @@ TEST_UNIT = eval [] (BinOp (NotEq, String "hij", String "hii")) === VBool true
 TEST_UNIT = eval [] (BinOp (Concat, String "hij", String "hji"))
               === VString "hijhji"
 
+(* Invalid binops *)
+TEST_UNIT = check_error (eval [] (parse_expr "() + true"))             === true
+TEST_UNIT = check_error (eval [] (parse_expr "() * true"))             === true
+TEST_UNIT = check_error (eval [] (parse_expr "() - true"))             === true
+TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) + (4, 3)"))       === true
+TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) * (4, 3)"))       === true
+TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) - (4, 3)"))       === true
+TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) + Left 3")) === true
+TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) * Left 3")) === true
+TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) - Left 3")) === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (Plus, String "abc", String "def")))  === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (Minus, String "abc", String "def"))) === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (Times, String "abc", String "def"))) === true
+
+TEST_UNIT = check_error (eval [] (parse_expr "() < true"))          === true
+TEST_UNIT = check_error (eval [] (parse_expr "() > 3"))             === true
+TEST_UNIT = check_error (eval [] (parse_expr "() <= (fun x -> x)")) === true
+TEST_UNIT = check_error (eval [] (parse_expr "() >= Left 4"))       === true
+TEST_UNIT = check_error (eval [] (parse_expr "() = false"))         === true
+TEST_UNIT = check_error (eval [] (parse_expr "() <> (4, 5)"))       === true
+
+TEST_UNIT = check_error (
+  eval [] (BinOp (Lt, String "abc", Int 4)))                      === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (Gt, String "abc", Bool false)))                 === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (LtEq, String "abc", Unit)))                     === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (GtEq, String "abc", Fun ("x", Var "x"))))       === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (Eq, String "abc", Variant ("Left", Int 3))))    === true
+TEST_UNIT = check_error (
+  eval [] (BinOp (NotEq, String "abc", Pair (Int 3, Int 4))))     === true
+
+TEST_UNIT = check_error (eval [] (parse_expr "() ^ true"))         === true
+TEST_UNIT = check_error (eval [] (parse_expr "3 ^ (fun x -> x)"))  === true
+TEST_UNIT = check_error (eval [] (parse_expr "(Left 3) ^ (2, 4)")) === true
+
 (* Functional comparisons *)
 TEST_UNIT = check_error (
   eval [] (parse_expr "(fun x -> x) = (fun y -> y)"))  === true
@@ -161,8 +202,17 @@ TEST_UNIT = eval [] (parse_expr "fun x -> 3 + x") === VClosure (
 TEST_UNIT = eval [] (parse_expr "(3 + 5, 4 < 3)") === VPair (
   VInt 8, VBool false)
 
+(* Pair error: first elem *)
+TEST_UNIT = check_error (eval [] (parse_expr "(3 + true, false)")) === true
+
+(* Pair error: second elem *)
+TEST_UNIT = check_error (eval [] (parse_expr "(3 + 4, () > true)")) === true
+
 (* Simple variant *)
 TEST_UNIT = eval [] (parse_expr "Left (3 + 5)") === VVariant ("Left", VInt 8)
+
+(* Error in variant expression *)
+TEST_UNIT = check_error (eval [] (parse_expr "Left (3 + true)")) === true
 
 (* Simple match *)
 TEST_UNIT = eval [] (
@@ -182,6 +232,10 @@ TEST_UNIT = eval [] (
 TEST_UNIT = eval [] (
   Match (String "a",
     [(PString "", Bool true); (PString "a", Bool false)]))      === VBool false
+
+(* Match: error in match expression *)
+TEST_UNIT = check_error (eval [] (
+  parse_expr "match 3 + () with 1 -> true | 3 -> false")) === true
 
 (* Match: pattern not found *)
 TEST_UNIT = check_error (eval [] (
@@ -370,7 +424,33 @@ let g5 = parse_expr "
     (3, Cons ((5, 3), Cons ((2, 10), Cons ((4, 5), Nil ())))), Cons (
     (4, Cons ((5, 10), Cons ((3, 4), Nil ()))), Cons (
     (5, Cons ((2, 6), Nil ())), Nil ())
-  ))))"
+  ))))";;
+let g6 = parse_expr "
+  Cons ((1,
+    Cons ((2, 100), Cons ((3, 50), Cons ((4, 5), Cons ((5, 3),
+    Cons ((6, 75), Cons ((7, 90), Cons ((8, 95), Nil ())))))))),
+  Cons ((2,
+    Cons ((1, 10), Cons ((3, 12), Cons ((4, 14), Cons ((5, 3),
+    Cons ((6, 16), Cons ((7, 18), Cons ((8, 20), Nil ())))))))),
+  Cons ((3,
+    Cons ((1, 20), Cons ((2, 45), Cons ((4, 3), Cons ((5, 10),
+    Cons ((6, 20), Cons ((7, 35), Cons ((8, 50), Nil ())))))))),
+  Cons ((4,
+    Cons ((1, 3), Cons ((2, 90), Cons ((3, 45), Cons ((5, 20),
+    Cons ((6, 70), Cons ((7, 100), Cons ((8, 200), Nil ())))))))),
+  Cons ((5,
+    Cons ((1, 10), Cons ((2, 90), Cons ((3, 41), Cons ((4, 21),
+    Cons ((6, 80), Cons ((7, 83), Cons ((8, 90), Nil ())))))))),
+  Cons ((6,
+    Cons ((1, 5), Cons ((2, 30), Cons ((3, 20), Cons ((4, 10),
+    Cons ((5, 10), Cons ((7, 10), Cons ((8, 16), Nil ())))))))),
+  Cons ((7,
+    Cons ((1, 3), Cons ((2, 10), Cons ((3, 30), Cons ((4, 11),
+    Cons ((5, 12), Cons ((6, 13), Cons ((8, 5), Nil ())))))))),
+  Cons ((8,
+    Cons ((1, 1), Cons ((2, 3), Cons ((3, 11), Cons ((4, 5),
+    Cons ((5, 2), Cons ((6, 1), Cons ((7, 2), Nil ())))))))),
+  Nil ()))))))))";;
 
 TEST_UNIT = eval [] (app_dijkstra 0 1 g1) === VInt (-1)
 TEST_UNIT = eval [] (app_dijkstra 0 0 g2) === VInt 0
@@ -380,72 +460,6 @@ TEST_UNIT = eval [] (app_dijkstra 1 4 g4) === VInt 12
 TEST_UNIT = eval [] (app_dijkstra 2 1 g4) === VInt (-1)
 TEST_UNIT = eval [] (app_dijkstra 1 2 g5) === VInt 16
 TEST_UNIT = eval [] (app_dijkstra 1 5 g5) === VInt 10
-
-(* The following tests have been removed because the expressions are not
-well-typed, so these scenarios should not occur*)
-
-(*
-(* Pair error: first elem *)
-TEST_UNIT = check_error (eval [] (parse_expr "(3 + true, false)")) === true
-
-(* Pair error: second elem *)
-TEST_UNIT = check_error (eval [] (parse_expr "(3 + 4, () > true)")) === true
-*)
-
-(*
-(* Error in variant expression *)
-TEST_UNIT = check_error (eval [] (parse_expr "Left (3 + true)")) === true
-*)
-
-(*
-(* Match: error in match expression *)
-TEST_UNIT = check_error (eval [] (
-  parse_expr "match 3 + () with 1 -> true | 3 -> false")) === true
-*)
-
-
-(*
-(* Invalid binops *)
-TEST_UNIT = check_error (eval [] (parse_expr "() + true"))             === true
-TEST_UNIT = check_error (eval [] (parse_expr "() * true"))             === true
-TEST_UNIT = check_error (eval [] (parse_expr "() - true"))             === true
-TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) + (4, 3)"))       === true
-TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) * (4, 3)"))       === true
-TEST_UNIT = check_error (eval [] (parse_expr "(3, 4) - (4, 3)"))       === true
-TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) + Left 3")) === true
-TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) * Left 3")) === true
-TEST_UNIT = check_error (eval [] (parse_expr "(fun x -> x) - Left 3")) === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (Plus, String "abc", String "def")))  === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (Minus, String "abc", String "def"))) === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (Times, String "abc", String "def"))) === true
-
-TEST_UNIT = check_error (eval [] (parse_expr "() < true"))          === true
-TEST_UNIT = check_error (eval [] (parse_expr "() > 3"))             === true
-TEST_UNIT = check_error (eval [] (parse_expr "() <= (fun x -> x)")) === true
-TEST_UNIT = check_error (eval [] (parse_expr "() >= Left 4"))       === true
-TEST_UNIT = check_error (eval [] (parse_expr "() = false"))         === true
-TEST_UNIT = check_error (eval [] (parse_expr "() <> (4, 5)"))       === true
-
-TEST_UNIT = check_error (
-  eval [] (BinOp (Lt, String "abc", Int 4)))                      === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (Gt, String "abc", Bool false)))                 === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (LtEq, String "abc", Unit)))                     === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (GtEq, String "abc", Fun ("x", Var "x"))))       === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (Eq, String "abc", Variant ("Left", Int 3))))    === true
-TEST_UNIT = check_error (
-  eval [] (BinOp (NotEq, String "abc", Pair (Int 3, Int 4))))     === true
-
-TEST_UNIT = check_error (eval [] (parse_expr "() ^ true"))         === true
-TEST_UNIT = check_error (eval [] (parse_expr "3 ^ (fun x -> x)"))  === true
-TEST_UNIT = check_error (eval [] (parse_expr "(Left 3) ^ (2, 4)")) === true
-*)
-
+TEST_UNIT = eval [] (app_dijkstra 1 2 g6) === VInt 82
 
 let () = Pa_ounit_lib.Runtime.summarize()
