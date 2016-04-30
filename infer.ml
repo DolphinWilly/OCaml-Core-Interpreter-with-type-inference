@@ -71,11 +71,10 @@ and subst_pat  s = function
  * need them, change their types or arguments, delete them, whatever.
  *)
 
-
-(** Format a list of equations for printing. *)
+(** format a list of equations for printing *)
 let format_eqns (f : Format.formatter) (eqns : equation list) : unit =
   (* see the comment in Eval.format_value for guidance implementing hints *)
-  failwith "One believes things because one has been conditioned to believe them."
+  failwith "unimplemented"
 
 (** use format_eqns to print a value to the console *)
 let print_eqns     = Printer.make_printer format_eqns
@@ -91,7 +90,7 @@ let counter =
 let newvar () : typ =
   TAlpha (Format.sprintf "n%02i" (counter ()) )
 
-(* return the constraints for a binary operator *)
+(** return the constraints for a binary operator *)
 let collect_binop (t : typ) (op : operator) (tl : typ) (tr : typ)
                      : equation list =
   match op with
@@ -99,21 +98,17 @@ let collect_binop (t : typ) (op : operator) (tl : typ) (tr : typ)
   | Gt | Lt | Eq | GtEq | LtEq | NotEq -> [Eq (t, TBool); Eq (tl, tr)]
   | Concat -> [Eq (t, TString); Eq (tl, TString); Eq (tr, TString)]
 
-(** return the constraints for an expr
-  * vars refers to a data structure that stores the types of each of the variables
-  * that have been defined.
-  * It is completely your decision what type of data structure you want to use for vars
-  *)
-(* find the latest binding in the vars*)
+(** find the latest binding in the vars *)
 let rec find (l : (var * typ) list) (x : var) : (var * typ) option =
   match l with
   | [] -> None
   | (v, t) :: tl -> if x = v then Some (v, t)
                     else find tl x
 
-(* Construct a list of types from a list of vars and a matching of
-  types to variable names. Also gives a dictionary associating variable names
-  to newvar names *)
+(** construct a list of types from a list of vars and a matching of
+  * types to variable names. Also gives a dictionary associating variable names
+  * to newvar names
+  *)
 let rec construct_type (l : var list) : typ list * (var -> string) =
   match l with
   | v::t ->
@@ -126,7 +121,7 @@ let rec construct_type (l : var list) : typ list * (var -> string) =
     end
   | [] -> ([], fun s -> s)
 
-(* Convert all variable names to associated type in the dictionary *)
+(** convert all variable names to associated type in the dictionary *)
 let rec convert_type (t : typ) (d : var -> string) : typ =
   match t with
   | TAlpha v -> TAlpha (d v)
@@ -140,13 +135,14 @@ let rec convert_type (t : typ) (d : var -> string) : typ =
     in TVariant (convert_list tl, tn)
   | x -> x
 
-(* Get the type associated with the given constructor, along with a dictionary
-  for conversion. *)
+(** get the type associated with the given constructor, along with a dictionary
+  * for conversion.
+  *)
 let rec get_type (l : (tname * typ) list) (c : tname) (d : var -> string)
                     : typ =
   match l with
   | (cn, ty)::t -> if cn = c then convert_type ty d else get_type t c d
-  | [] -> failwith "unbound type constructor"
+  | [] -> failwith ("unbound type constructor" ^ c)
 
 (* get the relevant spec from a list of specs *)
 let rec get_spec (l : variant_spec list) (c : constructor) : variant_spec =
@@ -157,8 +153,13 @@ let rec get_spec (l : variant_spec list) (c : constructor) : variant_spec =
       | (ci, ti)::tc -> if ci = c then h else helper tc
       | [] -> get_spec t c in
     helper h.constructors
-  | [] -> failwith "type not defined"
+  | [] -> failwith ("unbound type constructor" ^ c)
 
+(** return the constraints for an expr
+  * vars refers to a data structure that stores the types of each of the
+  * variables that have been defined.
+  * It is a list of pairs (var, typ)
+  *)
 let rec collect_expr (specs : variant_spec list)
                      (vars : (var * typ) list)
                      (e : annotated_expr) : equation list =
