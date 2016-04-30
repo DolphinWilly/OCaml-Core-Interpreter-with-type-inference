@@ -72,9 +72,29 @@ and subst_pat  s = function
  *)
 
 (** format a list of equations for printing *)
-let format_eqns (f : Format.formatter) (eqns : equation list) : unit =
-  (* see the comment in Eval.format_value for guidance implementing hints *)
-  failwith "unimplemented"
+let rec format_eqns (f : Format.formatter) (eqns : equation list) : unit =
+  match eqns with
+  | Eq (t1, t2)::[] -> Format.fprintf f "[%a = %a]"
+                       format_type t1 format_type t2
+  | Eq (t1, t2)::t  -> Format.fprintf f "[%a = %a], %a"
+                      format_type t1 format_type t2 format_eqns t
+  | []              -> Format.fprintf f ""
+and format_type (f : Format.formatter) (t : typ) : unit =
+  match t with
+  | TUnit           -> Format.fprintf f "unit"
+  | TInt            -> Format.fprintf f "int"
+  | TBool           -> Format.fprintf f "bool"
+  | TString         -> Format.fprintf f "string"
+  | TAlpha s        -> Format.fprintf f "'%s" s
+  | TArrow (t1, t2) -> Format.fprintf f "%a -> %a"
+                       format_type t1 format_type t2
+  | TStar (t1, t2)  -> Format.fprintf f "%a * %a" format_type t1 format_type t2
+  | TVariant (l, n) -> Format.fprintf f "(%a) %s" format_typelist l n
+and format_typelist (f : Format.formatter) (l : typ list) : unit =
+  match l with
+  | h::[] -> Format.fprintf f "%a" format_type h
+  | h::t  -> Format.fprintf f "%a, %a" format_type h format_typelist t
+  | []    -> Format.fprintf f ""
 
 (** use format_eqns to print a value to the console *)
 let print_eqns     = Printer.make_printer format_eqns
@@ -102,14 +122,13 @@ let collect_binop (t : typ) (op : operator) (tl : typ) (tr : typ)
 let rec find (l : (var * typ) list) (x : var) : (var * typ) option =
   match l with
   | [] -> None
-  | (v, t) :: tl -> if x = v then Some (v, t)
-                    else find tl x
+  | (v, t) :: tl -> if x = v then Some (v, t) else find tl x
 
-(** construct a list of types from a list of vars and a matching of
+(** construct a list of types from a list of variant names and a matching of
   * types to variable names. Also gives a dictionary associating variable names
   * to newvar names
   *)
-let rec construct_type (l : var list) : typ list * (var -> string) =
+let rec construct_type (l : talpha list) : typ list * (talpha -> talpha) =
   match l with
   | v::t ->
     begin
@@ -121,8 +140,8 @@ let rec construct_type (l : var list) : typ list * (var -> string) =
     end
   | [] -> ([], fun s -> s)
 
-(** convert all variable names to associated type in the dictionary *)
-let rec convert_type (t : typ) (d : var -> string) : typ =
+(** convert all variable names to associated newvars in the dictionary *)
+let rec convert_type (t : typ) (d : talpha -> talpha) : typ =
   match t with
   | TAlpha v -> TAlpha (d v)
   | TArrow (t1, t2) -> TArrow (convert_type t1 d, convert_type t2 d)
@@ -133,16 +152,16 @@ let rec convert_type (t : typ) (d : var -> string) : typ =
       | h::t -> (convert_type h d)::(convert_list t)
       | [] -> []
     in TVariant (convert_list tl, tn)
-  | x -> x
+  | _ -> t
 
-(** get the type associated with the given constructor, along with a dictionary
-  * for conversion.
+(** get the type associated with the given constructor, and converts the
+  * talpha names using the dictionary
   *)
-let rec get_type (l : (tname * typ) list) (c : tname) (d : var -> string)
+let rec get_type (l : (tname * typ) list) (c : tname) (d : talpha -> talpha)
                     : typ =
   match l with
   | (cn, ty)::t -> if cn = c then convert_type ty d else get_type t c d
-  | [] -> failwith ("unbound type constructor" ^ c)
+  | [] -> failwith ("unbound type constructor " ^ c)
 
 (* get the relevant spec from a list of specs *)
 let rec get_spec (l : variant_spec list) (c : constructor) : variant_spec =
@@ -153,7 +172,7 @@ let rec get_spec (l : variant_spec list) (c : constructor) : variant_spec =
       | (ci, ti)::tc -> if ci = c then h else helper tc
       | [] -> get_spec t c in
     helper h.constructors
-  | [] -> failwith ("unbound type constructor" ^ c)
+  | [] -> failwith ("unbound type constructor " ^ c)
 
 (** return the constraints for an expr
   * vars refers to a data structure that stores the types of each of the

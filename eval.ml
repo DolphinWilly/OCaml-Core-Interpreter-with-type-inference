@@ -21,17 +21,24 @@ and environment = (var * value ref) list
  * need them, change their types or arguments, delete them, whatever.
  *)
 
-let rec string_of_value (v : value) : string =
+(** Format a value for printing. *)
+let rec format_value (f : Format.formatter) (v : value) : unit =
   match v with
-  | VUnit                -> "()"
-  | VInt i               -> string_of_int i
-  | VBool b              -> string_of_bool b
-  | VString s            -> s
-  | VClosure _           -> "<fun>"
-  | VVariant (con, val_) -> con ^ " " ^ (string_of_value val_)
-  | VPair (v1, v2)       -> "(" ^ (string_of_value v1) ^ ", "
-                                ^ (string_of_value v2) ^ ")"
-  | VError s             -> s
+  | VUnit                -> Format.fprintf f "()"
+  | VInt i               -> Format.fprintf f "%d" i
+  | VBool b              -> Format.fprintf f "%b" b
+  | VString s            -> Format.fprintf f "%s" s
+  | VClosure _           -> Format.fprintf f "<fun>"
+  | VVariant (con, val_) -> Format.fprintf f "%s %a" con format_value val_
+  | VPair (v1, v2)       -> Format.fprintf f "(%a, %a)"
+                            format_value v1 format_value v2
+  | VError s             -> Format.fprintf f "%s" s
+
+(** use format_value to print a value to the console *)
+let print_value = Printer.make_printer format_value
+
+(** use format_value to convert a value to a string *)
+let string_of_value = Printer.make_string_of format_value
 
 let string_of_binop (op : operator) : string =
   match op with
@@ -122,13 +129,6 @@ let rec lookup_var (env : environment) (x : var) : value =
   match env with
   | []           -> VError ("Unbound variable '" ^ x ^ "'")
   | (v, rval)::t -> if x = v then !rval else lookup_var t x
-
-(** Format a value for printing. *)
-let rec format_value (f : Format.formatter) (v : value) : unit =
-  failwith "unimplemented"
-
-(** use format_value to print a value to the console *)
-let print_value = failwith "unimplemented"
 
 (******************************************************************************)
 (** eval **********************************************************************)
