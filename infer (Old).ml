@@ -83,6 +83,9 @@ let print_eqns     = Printer.make_printer format_eqns
 (** use format_value to convert a value to a string *)
 let string_of_eqns = Printer.make_string_of format_eqns
 
+
+
+
 (** generate an unused type variable *)
 let counter =
   let r = ref 0 in
@@ -91,13 +94,19 @@ let counter =
 let newvar () : typ =
   TAlpha (Format.sprintf "n%02i" (counter ()) )
 
+
+
+
+
 (* return the constraints for a binary operator *)
-let collect_binop (t : typ) (op : operator) (tl : typ) (tr : typ)
-                     : equation list =
+let collect_binop (t:typ) (op:operator) (tl:typ) (tr:typ) : equation list =
   match op with
   | Plus | Minus | Times -> [Eq (t, TInt); Eq (tl, TInt); Eq (tr, TInt)]
   | Gt | Lt | Eq | GtEq | LtEq | NotEq -> [Eq (t, TBool); Eq (tl, tr)]
   | Concat -> [Eq (t, TString); Eq (tl, TString); Eq (tr, TString)]
+
+
+
 
 (** return the constraints for an expr
   * vars refers to a data structure that stores the types of each of the variables
@@ -105,156 +114,140 @@ let collect_binop (t : typ) (op : operator) (tl : typ) (tr : typ)
   * It is completely your decision what type of data structure you want to use for vars
   *)
 (* find the latest binding in the vars*)
-let rec find (l : (var * typ) list) (x : var) : (var * typ) option =
+let rec find (l: (var * typ) list) (x: var): (var * typ) option =
   match l with
   | [] -> None
   | (v, t) :: tl -> if x = v then Some (v, t)
                     else find tl x
 
-(* Construct a list of types from a list of vars and a matching of
-  types to variable names. Also gives a dictionary associating variable names
-  to newvar names *)
-let rec construct_type (l : var list) : typ list * (var -> string) =
+(* find what type does a specific constructor belong to *)
+let rec fc (l: variant_spec list) (c: constructor): (talpha list * tname * typ) =
   match l with
-  | v::t ->
-    begin
-      let (vl, d) = construct_type t in
-      let x = newvar () in
-      match x with
-      | TAlpha xs -> (x::vl, fun s -> if s = v then xs else d s)
-      | _ -> failwith "newvar () generated something that wasnt a TAlpha"
-    end
-  | [] -> ([], fun s -> s)
-
-(* Convert all variable names to associated type in the dictionary *)
-let rec convert_type (t : typ) (d : var -> string) : typ =
-  match t with
-  | TAlpha v -> TAlpha (d v)
-  | TArrow (t1, t2) -> TArrow (convert_type t1 d, convert_type t2 d)
-  | TStar (t1, t2) -> TStar (convert_type t1 d, convert_type t2 d)
-  | TVariant (tl, tn) ->
-    let rec convert_list l =
-      match l with
-      | h::t -> (convert_type h d)::(convert_list t)
-      | [] -> []
-    in TVariant (convert_list tl, tn)
-  | x -> x
-
-(* Get the type associated with the given constructor, along with a dictionary
-  for conversion. *)
-let rec get_type (l : (tname * typ) list) (c : tname) (d : var -> string)
-                    : typ =
-  match l with
-  | (cn, ty)::t -> if cn = c then convert_type ty d else get_type t c d
-  | [] -> failwith "unbound type constructor"
-
-(* get the relevant spec from a list of specs *)
-let rec get_spec (l : variant_spec list) (c : constructor) : variant_spec =
-  match l with
-  | h::t ->
-    let rec helper cl =
-      match cl with
-      | (ci, ti)::tc -> if ci = c then h else helper tc
-      | [] -> get_spec t c in
-    helper h.constructors
   | [] -> failwith "type not defined"
+  | hd :: tl -> let vs = hd.vars in
+                let tn = hd.name in
+                let cs = hd.constructors in
+                let rec helper cs =
+                  match cs with
+                  | [] -> fc tl c
+                  | (constr, ty) :: til ->
+                    if constr = c then (vs, tn, ty)
+                    else helper til in
+                helper cs
 
-let rec collect_expr (specs : variant_spec list)
-                     (vars : (var * typ) list)
-                     (e : annotated_expr) : equation list =
+
+
+let rec collect_expr (specs:variant_spec list) (vars: (var * typ) list) (e : annotated_expr)
+                     : equation list =
       match e with
-      | AVar (t1, v1) ->
-        begin
-          match find vars v1 with
-          | None -> failwith ("Unbound variable " ^ v1)
-          | Some (v, t) -> [Eq (t1, t)]
-        end
+      | AVar (t1, v1) -> begin match find vars v1 with
+                                | None -> failwith "Unbound variable"
+                                | Some (v, t) -> [Eq (t1, t)]
+                         end
       | AApp (t1, e1, e2) ->
-        let dom = newvar () in
-        let ran = newvar () in
-        [Eq (t1, ran); Eq (dom, typeof e2); Eq (typeof e1, TArrow (dom, ran))] @
-        (collect_expr specs vars e1) @
-        (collect_expr specs vars e2)
+                begin match e1 with
+                       | AFun (t2, (v1, t3), e3)
+                          -> let t4 = typeof e3 in
+                             let t5 = typeof e2 in
+                      [Eq (t2, TArrow (t3, t4)); Eq (t3, t5)] @
+                      (collect_expr specs ((v1,t3)::vars) e3) @
+                      (collect_expr specs vars e2)
+                      | _ -> failwith "apply should use a function"
+
+                end
       | AFun (t1, (v1, t2), e1) ->
-        (Eq (t1, TArrow (t2, typeof e1)))::
-          (collect_expr specs ((v1, t2)::vars) e1)
+              let t3 = typeof e1 in
+              (Eq (t1, TArrow (t2, t3))) :: (collect_expr specs ((v1, t2)::vars) e1)
       | ALet (t1, (v1, t2), e1, e2) ->
-        (Eq (t2, typeof e1))::(Eq (typeof e2, t1))::
-        (collect_expr specs vars e1) @
-        (collect_expr specs ((v1, t2)::vars) e2)
+              let t3 = typeof e1 in
+              let t4 = typeof e2 in
+              (Eq (t2, t3)) :: (Eq (t4, t1)) :: (collect_expr specs vars e1)
+              @ (collect_expr specs ((v1, t2)::vars) e2)
       | ALetRec (t1, (v1, t2), e1, e2) ->
-        (Eq (t2, typeof e1))::(Eq (typeof e2, t1))::
-        (collect_expr specs ((v1, t2)::vars) e1) @
-        (collect_expr specs ((v1, t2)::vars) e2)
+              let t3 = typeof e1 in
+              let t4 = typeof e2 in
+              (Eq (t2, t3)) :: (Eq (t4, t1)) :: (collect_expr specs ((v1,t2)::vars) e1)
+              @ (collect_expr specs ((v1, t2)::vars) e2)
       | AUnit t1 -> [Eq (t1, TUnit)]
       | AInt (t1, i) -> [Eq (t1, TInt)]
       | ABool (t1, b) -> [Eq (t1, TBool)]
       | AString (t1, s) -> [Eq (t1, TString)]
-      | APair (t1, e1, e2) ->
-        (Eq (t1, TStar (typeof e1, typeof e2)))::
-        (collect_expr specs vars e1) @
-        (collect_expr specs vars e2)
-      | ABinOp (t1, o, e1, e2) ->
-        (collect_binop t1 o (typeof e1) (typeof e2)) @
-        (collect_expr specs vars e1) @
-        (collect_expr specs vars e2)
-      | AIf (t1, e1, e2, e3) ->
-        (Eq (typeof e1, TBool))::(Eq (t1, typeof e2))::(Eq (t1, typeof e3))::
-        (collect_expr specs vars e1) @
-        (collect_expr specs vars e2) @
-        (collect_expr specs vars e3)
+      | APair (t1, e1, e2) -> let t2 = typeof e1 in
+                              let t3 = typeof e2 in
+              (Eq (t1, TStar (t2, t3))):: (collect_expr specs vars e1)
+              @ (collect_expr specs vars e2)
+      | ABinOp (t1, o, e1, e2) -> let t2 = typeof e1 in
+                                  let t3 = typeof e2 in
+              (collect_binop t1 o t2 t3) @
+              (collect_expr specs vars e1) @
+              (collect_expr specs vars e2)
+      | AIf (t1, e1, e2, e3) -> let t2 = typeof e1 in
+                                let t3 = typeof e2 in
+                                let t4 = typeof e3 in
+            (Eq (t2, TBool)) :: (Eq (t1, t3)) :: (Eq (t1, t4)) :: (Eq (t3, t4))
+            :: (collect_expr specs vars e1) @
+            (collect_expr specs vars e2) @
+            (collect_expr specs vars e3)
       | AMatch (t1, e1, l) ->
-        begin
+         let rec helper t e l =
           match l with
-          | [] -> (collect_expr specs vars e1)
-          | (p1, ei)::t ->
-            (Eq (t1, typeof ei))::(Eq (typeof e1, typeof_pat p1))::
-            (collect_case specs vars p1 ei) @
-            (collect_expr specs vars (AMatch (t1, e1, t)))
-        end
+          | [] -> []
+          | hd::tl -> let (p1, e1) = hd in
+                      let t1 = typeof_pat p1 in
+                      let t2 = typeof e1 in
+                      let t0 = typeof e in
+                      (Eq (t, t2)) :: (Eq (t0, t1)) ::
+                      (collect_case specs vars p1 e1) @
+                      (helper t e tl) in
+         (helper t1 e1 l) @ (collect_expr specs vars e1)
       | AVariant (t1, c, e1) ->
-        let vspec = get_spec specs c in
-        let (vl, d) = construct_type vspec.vars in
-        let ty = get_type vspec.constructors c d in
-        (Eq (t1, TVariant (vl, vspec.name)))::
-        (Eq (ty, typeof e1))::
-        (collect_expr specs vars e1)
+            let (tal, tn, ty) = fc specs c in
+            let rec tcreate (n: int): typ list =
+             if n = 0 then []
+             else (newvar ()) :: (tcreate (n-1)) in
+            let x = tcreate (List.length tal) in
+            (Eq (t1, TVariant (x, tn)) ) :: (Eq (ty, (typeof e1))) ::
+            (collect_expr specs vars e1)
+
+
+
+
 
 (** return the constraints for a match cases
   * tconst refers to the type of the parameters of the specific constructors
   * tvariant refers to the type of the variant as a whole
   *)
-and collect_case specs vs (p : annotated_pattern) (e : annotated_expr)
-                             : equation list =
-  (collect_pat specs p) @ (collect_expr specs ((collect_vars p) @ vs) e)
-
-(** return the constraints for a pattern *)
-and collect_pat specs (p : annotated_pattern) : equation list =
+and collect_case specs vs (p:annotated_pattern) (e:annotated_expr) =
   match p with
-    | APUnit    (t1)         -> [Eq (t1, TUnit)]
-    | APInt     (t1, n)      -> [Eq (t1, TInt)]
-    | APBool    (t1, b)      -> [Eq (t1, TBool)]
-    | APString  (t1, s)      -> [Eq (t1, TString)]
-    | APVar     (t1, x)      -> []
-    | APVariant (t1, c, p)   ->
-      let vspec = get_spec specs c in
-      let (vl, d) = construct_type vspec.vars in
-      let ty = get_type vspec.constructors c d in
-      (Eq (t1, TVariant (vl, vspec.name)))::
-      (Eq (ty, typeof_pat p))::
-      (collect_pat specs p)
+  | APVar (t1, x) -> (collect_expr specs ((x,t1)::vs) e)
+  | APPair (t1, p1, p2) -> (collect_pat specs p) @
+            (collect_case specs vs p1 e) @
+            (collect_case specs vs p2 e)
+  | _ -> (collect_pat specs p) @ (collect_expr specs vs e)
+
+
+
+(** return the constraints and variables for a pattern *)
+and collect_pat specs (p:annotated_pattern) =
+  match p with
+    | APUnit  (t1) -> [Eq (t1, TUnit)]
+    | APInt   (t1, n) -> [Eq (t1, TInt)]
+    | APBool  (t1, b) -> [Eq (t1, TBool)]
+    | APString  (t1, s) -> [Eq (t1, TString)]
+    | APVar     (t1, x) -> []
+    | APVariant (t1, c, p) ->
+            let (tal, tn, ty) = fc specs c in
+            let rec tcreate (n: int): typ list =
+             if n = 0 then []
+             else (newvar ()) :: (tcreate (n-1)) in
+            let x = tcreate (List.length tal) in
+            (Eq (t1, TVariant (x, tn))) :: (Eq (ty, (typeof_pat p))) ::
+            (collect_pat specs p)
     | APPair    (t1, p1, p2) ->
-      [Eq (t1, TStar (typeof_pat p1, typeof_pat p2))] @
-      (collect_pat specs p1)                          @
-      (collect_pat specs p2)
+        let t2 = typeof_pat p1 in
+        let t3 = typeof_pat p2 in
+        [Eq (t1, TStar (t2, t3))] @ (collect_pat specs p1) @ (collect_pat specs p2)
 
-(** return the variable bindings for a pattern *)
-and collect_vars (p : annotated_pattern) : ((var * typ) list) =
-  match p with
-  | APVar     (t1, x)      -> [(x, t1)]
-  | APPair    (t1, p1, p2) -> (collect_vars p1) @ (collect_vars p2)
-  | APVariant (t1, c, p1)  -> collect_vars p1
-  | _                      -> []
 
 (******************************************************************************)
 (** constraint generation                                                    **)
