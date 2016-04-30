@@ -113,6 +113,11 @@ TEST_UNIT = typeof_infer [] (parse_expr "let f = fun x -> x + 1 in let g = fun x
 TEST_UNIT = typeof_infer [] (parse_expr "fun x -> fun y -> fun z -> x z (y z)") ===
   parse_type "('a -> 'b -> 'c) -> ('a -> 'b) -> 'a -> 'c"
 
+(* From the PS *)
+let list_spec = parse_variant_spec "type 'a list = Nil of unit | Cons of 'a * 'a list"
+
+TEST_UNIT = typeof_infer [list_spec] (parse_expr "let x = Cons (1, Nil ()) in let y = Cons (true, Nil ()) in (x, y)") === parse_type "int list * bool list"
+
 (* Multiple variants *)
 let a_spec = parse_variant_spec "type ta = Right of unit";;
 let b_spec = parse_variant_spec "type 'a tb = Middle of 'a";;
@@ -128,7 +133,6 @@ TEST_UNIT = typeof_infer [a_spec; b_spec; c_spec] (parse_expr "
   === parse_type "((int * int) * int) * ('a -> 'b -> 'c -> ('a * 'b) * 'c)"
 
 (* Deep match  on variants*)
-let list_spec = parse_variant_spec "type 'a list = Nil of unit | Cons of 'a * 'a list"
 
 TEST_UNIT = typeof_infer [list_spec] (parse_expr "
   match Cons (4, Cons (3, Nil ())) with
