@@ -186,23 +186,22 @@ let rec eval env e =
     end
   | Match (exp, lst)   ->
     begin
-      let rec eval_match l =
-        let v1 = eval env exp in
-        match l with
-        | [] -> VError ("Pattern match on '" ^ (string_of_value v1)
-                                             ^ "' failed")
-        | (pat, exp_)::t ->
-          begin
-            match find_match pat v1 with
-            | Some newenv ->
-              if has_duplicate newenv then
-                VError ("Duplicate binding in pattern '"
-                  ^ string_of_pattern pat ^ "'")
-              else eval (newenv@env) exp_
-            | None        -> eval_match t
-          end in
-      match (eval env exp) with
+      let v1 = eval env exp in
+      match v1 with
       | VError s -> VError s
-      | _        -> eval_match lst
+      | _        -> eval_match env v1 lst
+    end
+(** evaluate a match case *)
+and eval_match env v l =
+  match l with
+  | [] -> VError ("Pattern match on '" ^ (string_of_value v) ^ "' failed")
+  | (pat, exp)::t ->
+    begin
+      match find_match pat v with
+      | Some newenv ->
+        if has_duplicate newenv then VError (
+          "Duplicate binding in pattern '" ^ string_of_pattern pat ^ "'")
+        else eval (newenv @ env) exp
+      | None -> eval_match env v t
     end
 

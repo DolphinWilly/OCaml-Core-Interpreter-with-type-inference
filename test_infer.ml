@@ -202,20 +202,11 @@ TEST_UNIT = typeof_infer [] catalan === TArrow (TInt, TInt)
 (* Dijkstra's algorithm. Graph is a list of pairs (v, n) where n is a list
 of neighbors (v, w_v), v is a vertex (int), w_v are costs >= 0. Not efficient.*)
 let shortest_distance = parse_expr "
-  let rec generate_lvisit =
-    fun g ->
-      match g with
-      | Nil () -> Nil ()
-      | Cons ((v, n), t) -> Cons ((v, 0-1), generate_lvisit t) in
   let rec remove =
     fun e ->
-    fun l ->
-      match l with
-      | Nil () -> Nil ()
-      | Cons ((v, d), t) ->
-        match e with
-        | ((v_, d_), n) ->
-          if v = v_ then remove e t else Cons ((v, d), remove e t) in
+    fun f ->
+      match e with
+      | ((v_, d_), n) -> fun x -> if x = v_ then 0-1 else f x in
   let rec get_neighbors =
     fun v ->
     fun g ->
@@ -231,20 +222,23 @@ let shortest_distance = parse_expr "
           match av with
           | ((v, dist), n) -> dist in
       let rec get_smallest =
-        fun lvisit ->
+        fun visit ->
         fun minv ->
-          match (lvisit, minv) with
-          | (Nil (), (vm, dm)) -> ((vm, dm), get_neighbors vm g)
-          | (Cons ((v, d), t), (vm, dm)) ->
-            if dm = 0-1 then get_smallest t (v, d)
+        fun gr ->
+          match (gr, minv) with
+          | (Nil (), vm) -> ((vm, visit vm), get_neighbors vm g)
+          | (Cons ((v, n), t), vm) ->
+            if vm = 0-1 then get_smallest visit v t
             else
-              if d <> 0-1 then
-                if d < dm then get_smallest t (v, d)
-                else get_smallest t (vm, dm)
-              else get_smallest t (vm, dm) in
+              if visit vm = 0-1 then get_smallest visit v t
+              else
+                if visit v <> 0-1 then
+                  if visit v < visit vm then get_smallest visit v t
+                  else get_smallest visit vm t
+                else get_smallest visit vm t in
       let rec helper =
         fun cur ->
-        fun lvisit ->
+        fun visit ->
           let vcur =
             match cur with
             | ((vc, dc), n) -> vc in
@@ -256,7 +250,7 @@ let shortest_distance = parse_expr "
             let ncur =
               match cur with
               | (v, n) -> n in
-            let lvisitn = remove cur lvisit in
+            let visitn = remove cur visit in
             let rec get_cost =
               fun v ->
               fun nlist ->
@@ -264,22 +258,27 @@ let shortest_distance = parse_expr "
                 | Nil () -> 0-1
                 | Cons ((v_, w), t) -> if v = v_ then w else get_cost v t in
             let rec update =
-              fun lvisit ->
-                match lvisit with
-                | Nil () -> Nil ()
-                | Cons ((v, d), t) ->
+              fun visit ->
+              fun gr ->
+                match gr with
+                | Nil () -> visit
+                | Cons ((v, n), t) ->
                   let c = get_cost v ncur in
-                  if c = 0-1 then Cons ((v, d), update t)
+                  if c = 0-1 then update visit t
                   else
-                    if d = 0-1 then Cons ((v, c + dcur), update t)
+                    if visit v = 0-1 then
+                      update (fun x -> if x = v then c + dcur else visit x) t
                     else
-                      if c + dcur >= d then Cons ((v, d), update t)
-                      else Cons ((v, c + dcur), update t) in
-            let lvisitu = update lvisitn in
-            match lvisitu with
-            | Nil () -> 0-1
-            | Cons (h, t) -> helper (get_smallest lvisitu (0, 0-1)) lvisitu in
-      helper ((vi, 0), get_neighbors vi g) (generate_lvisit g) in
+                      if c + dcur >= visit v then update visit t
+                      else
+                        update (fun x -> if x = v then c + dcur else visit x) t
+                  in
+            let visitu = update visitn g in
+            let s = get_smallest visitu (0-1) g in
+            match s with
+            | ((v, d), n) ->
+              if d = 0-1 then 0-1 else helper s visitu in
+      helper ((vi, 0), get_neighbors vi g) (fun x -> 0-1) in
   shortest_distance";;
 
 TEST_UNIT = typeof_infer [list_spec] shortest_distance ===
