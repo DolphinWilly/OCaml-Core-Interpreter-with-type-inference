@@ -1,16 +1,58 @@
-Name:
-NetID:
+Name: Alex Chen, Weiyu Wang
+NetID: ac2496, ww393
 
 Summarize your solution
 -----------------------
 
 * What was your approach to solving the assignment?
+
+... probably the same as everyone else's, especally for eval. There may
+be some slight uniqueness in our implementation of infer, namely:
+
+  - variable binding list is represented as a list of var * typ (ok,
+    everyone probably used this type)
+  - in order to correctly infer variant types, our solution was to first get
+    the letters from the corresponding vars, create newvars for each,
+    and then when getting the type from the constructor field, we used a
+    dictionary to convert all of the generic 'as and 'bs to the unique newvars
+  - There might have been a number of ways to do app for infer, but the method
+    we chose was to create newvars for the (unknown) domain and range and
+    tie the types together using those newvars, rather than to infer down the
+    function expression.
+
+Our tests systematically cover all of the simple cases, a few special cases,
+and then a number of actual expressions that utilize multiple types.
+Special cases include: duplicate bindings, functional equality, errors in pair
+/ etc to check that the VError bubbles down, shadowing, deep matching, and
+a nested match.
+
+Our "real" tests were: reversing a list, positive integer gcd, count_bin_trees
+from PS1, and Dijkstra's algorithm.
+
+Logistically, Alex worked on eval and test_eval and Weiyu worked on infer.
+Alex also wrote a test suite for infer which he used to fix a number of bugs
+with the its initial implementation.
+
 * Are there any known bugs in your solution?
+
+No.
 
 Feedback on the assignment
 --------------------------
 
 * What was fun about the assignment?
+
+Everything was equally fun, except for the copy-paste binop stuff and
+the copy-paste test cases, which were less fun.
+
 * What did you find especially hard?
+
+Infer for app was surprisingly difficult. Other than that, infer for variants
+was probably the hardest part, though it was more annoying than tricky. All of
+eval was very straightforward.
+
 * How could the assignment be made more valuable?
 
+Let the students do the unification / other phases! Just writing collect
+is boring and not very meaningful. Less hand-holding in general would make
+the assignment more interesting.
